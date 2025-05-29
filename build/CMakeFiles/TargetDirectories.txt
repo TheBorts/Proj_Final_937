@@ -1,0 +1,3 @@
+/home/lucasborts/Documents/UNICAMP/Materias/Semestre_5/MC927/lab02/build/CMakeFiles/lab02.dir
+/home/lucasborts/Documents/UNICAMP/Materias/Semestre_5/MC927/lab02/build/CMakeFiles/edit_cache.dir
+/home/lucasborts/Documents/UNICAMP/Materias/Semestre_5/MC927/lab02/build/CMakeFiles/rebuild_cache.dir
