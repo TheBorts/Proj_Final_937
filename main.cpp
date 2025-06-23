@@ -8,17 +8,19 @@
 #include <fstream>
 #include <iostream>
 
+#define STB_IMAGE_IMPLEMENTATION
 #include "include/stb_image.h"
 #include "include/shaders.h"
 #include "include/camera.h"
 #include "include/clas.h"
+#include "include/physics.h"
 
 using namespace std;
 
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-camera cam(glm::vec3(400.0f, 0.0f, 0.0f));
+camera cam(glm::vec3(4.0f, 0.0f, 0.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -70,7 +72,7 @@ void processInput(GLFWwindow *window){
 int main(int argc, char** argv)
 {
     GLFWwindow* window;
-    
+
     /* Initialize the library */
     if (!glfwInit())
     {
@@ -115,7 +117,7 @@ int main(int argc, char** argv)
         myScene.add_mesh(argv[i]);
     }
 
-    lightSource light = lightSource(400.0f, 0.0f, 0.0f, 0.3f, 0.2f, 0.7f, 0.8f, 0.5f, 0.1f, 1.0f, 1.0f, 1.0f);
+    lightSource light = lightSource(400.0f, 0.0f, 0.0f, 0.3f, 0.3f, 0.3f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 
     Shader meuShader("../shaders/myshader.vs", "../shaders/myshader.fs");
     //Shader meuShader("../shaders/light.vs", "../shaders/light.fs");
@@ -127,6 +129,9 @@ int main(int argc, char** argv)
     
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);  // Fragments closer to the camera overwrite farther ones
+
+    // Enable wireframe mode for debugging
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Uncomment to enable wireframe
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
