@@ -6,7 +6,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-
 enum camera_Movement {
     FORWARD,
     BACKWARD,
@@ -14,9 +13,9 @@ enum camera_Movement {
     RIGHT
 };
 
-const float YAW = -90.0f;
+const float YAW = -180.0f;
 const float PITCH = 0.0f;
-const float SPEED = 96.0f;
+const float SPEED = 90.0f;
 const float SENSITIVITY = 0.6f;
 const float ZOOM = 45.0f;
 
@@ -35,19 +34,22 @@ class camera{
         float MouseSense;
         float Zoom;
 
-        camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MoveSpeed(SPEED), MouseSense(SENSITIVITY), Zoom(ZOOM){
+        camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) : MoveSpeed(SPEED), MouseSense(SENSITIVITY), Zoom(ZOOM){
             Position = position;
             WorldUp = up;
             Yaw = yaw;
             Pitch = pitch;
+            Front = -1.0f * glm::normalize(Position); // Camera looking at the origin
             updateCameraVectors();
         }
 
-        camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MoveSpeed(SPEED), MouseSense(SENSITIVITY), Zoom(ZOOM){
+        // Constructor with parameters for position, up vector, yaw, and pitch and camera looking at the origin
+        camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch) : MoveSpeed(SPEED), MouseSense(SENSITIVITY), Zoom(ZOOM){
             Position = glm::vec3(posX, posY, posZ);
             WorldUp = glm::vec3(upX, upY, upZ);
             Yaw = yaw;
             Pitch = pitch;
+            Front = -1.0f * glm::normalize(Position); // Camera looking at the origin
             updateCameraVectors();
         }
 
