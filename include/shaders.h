@@ -15,10 +15,10 @@ public:
     unsigned int ID;
 
     Shader(const char* sVertexPath, const char* sFragPath){
-        std::string vertexCode;
-        std::string fragmentCode;
-        std::ifstream sVertexFile;
-        std::ifstream sFragFile;
+        std::string vertexCode = "";
+        std::string fragmentCode = "";
+        std::ifstream sVertexFile = std::ifstream();
+        std::ifstream sFragFile = std::ifstream();
 
         try{
             sVertexFile.open(sVertexPath);
@@ -134,8 +134,8 @@ public:
 private:
 
     void checkCompileErrors(GLuint shader, std::string type){
-        GLint success;
-        GLchar infoLog[1024];
+        GLint success = 1;
+        GLchar infoLog[1024] = "";
         if (type != "Program"){
             glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
             if (!success){
