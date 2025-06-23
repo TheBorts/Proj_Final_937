@@ -6,6 +6,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <fstream>
+#include <filesystem>
+#include <vector>
+#include <unordered_map>
 
 #include "shaders.h"
 
@@ -25,7 +28,7 @@ class material {
 
 class vertice{
     public:
-        float x, y, z;
+        float x = 0, y = 0, z = 0;
         vertice() : x(0.0f), y(0.0f), z(0.0f) {}
         vertice(float x, float y, float z) : x(x), y(y), z(z) {}
 };
@@ -93,43 +96,61 @@ class vertex{
     public:
         glm::vec3 position;
         glm::vec3 normals;
-        vertex() : position(glm::vec3(0.0f)), normals(glm::vec3(0.0f)) {}
-        vertex(vertice v, normal n) 
-            : position(glm::vec3(v.x, v.y, v.z)), normals(glm::vec3(n.x, n.y, n.z)) {}
+        glm::vec2 texture_coords;
+        vertex() : position(glm::vec3(0.0f)), normals(glm::vec3(0.0f)), texture_coords(glm::vec2(0.0f)) {}
+        vertex(vertice v, normal n)
+            : position(glm::vec3(v.x, v.y, v.z)), normals(glm::vec3(n.x, n.y, n.z)), texture_coords(glm::vec2(0.0f)) {}
+        vertex(vertice v, normal n, texture t)
+            : position(glm::vec3(v.x, v.y, v.z)), normals(glm::vec3(n.x, n.y, n.z)), texture_coords(glm::vec2(t.u, t.v)) {}
         void print() const {
             std::cout << "Vertex Position: (" << position.x << ", " << position.y << ", " << position.z << ") "
-                      << "Normal: (" << normals.x << ", " << normals.y << ", " << normals.z << ")" << std::endl;
+                      << "Normal: (" << normals.x << ", " << normals.y << ", " << normals.z << ") "
+                      << "Texture: (" << texture_coords.x << ", " << texture_coords.y << ")" << std::endl;
+        }
+        void print_textures() const {
+            std::cout << "Texture Coordinates: (" << texture_coords.x << ", " << texture_coords.y << ")" << std::endl;
         }
 };
 
-class object3D {
+class model3D {
     public:
-        vertice* vertices;
-        normal* normals;
-        texture* textures;
-        face* faces;
-        face* init_faces;
-        GLuint* indices;
-        long long num_vertices;
-        long long num_textures;
-        long long num_normals;
-        long long num_faces;
-        long long init_num_faces;
-        long long max_num_faces;
+        vertice* vertices = nullptr;
+        
+        texture* textures = nullptr;
+        normal* normals = nullptr;
+        face* faces = nullptr;
+
+        face* init_faces = nullptr;
+        GLuint* indices = nullptr;
+        
+        long long num_vertices = 0;
+        long long num_textures = 0;
+        long long num_normals = 0;
+        long long num_faces = 0;
+        long long init_num_faces = 0;
+        long long max_num_faces = 0;
+        
         vertice center = vertice();
-        std::string obj_name = "";
+        
+        std::string mod_name = "";
+
         std::string path_material = "";
         material mat = material();
+        
+        std::string path_texture = "";
 
-        std::ifstream myFile;
-        object3D() : vertices(nullptr), normals(nullptr), faces(nullptr), num_vertices(0), num_normals(0), num_faces(0) {}
-        object3D(const std::string& filename) : vertices(nullptr), textures(nullptr), normals(nullptr), faces(nullptr), indices(nullptr), num_vertices(0), num_normals(0), num_faces(0), max_num_faces(0) {
+        std::ifstream myFile = std::ifstream();
+
+        model3D() {}
+        model3D(const std::string& filename){
+            
             myFile.open(filename);
-            if (!myFile.is_open()) {
+            if (myFile.fail()) {
                 std::cerr << "Error opening file: " << filename << std::endl;
                 return;
             }
-            std::string line;
+
+            std::string line = "";
             while (getline(myFile, line)) {
                 if (line.substr(0, 2) == "v ") {
                     num_vertices++;
@@ -149,7 +170,6 @@ class object3D {
             textures = new texture[num_textures];
             faces = new face[num_faces];
             init_faces = new face[num_faces];
-            indices = new GLuint[3 * num_faces];
             
             max_num_faces = num_faces;
 
@@ -194,6 +214,8 @@ class object3D {
             // Triangulate faces if necessary
             triangulate_faces();
 
+            indices = new GLuint[3 * num_faces];
+            
             for (long long i = 0; i < num_faces; i++) {
                 indices[3 * i] = faces[i].vertices[0] - 1;
                 indices[3 * i + 1] = faces[i].vertices[1] - 1;
@@ -227,25 +249,40 @@ class object3D {
 
     private:
 
+        void trim(std::string& str) {
+            // Remove leading and trailing whitespace
+            str.erase(0, str.find_first_not_of(" \t\n\r\f\v"));
+            str.erase(str.find_last_not_of(" \t\n\r\f\v") + 1);
+        }
+
         void get_name(std::string line) {
             line = line.substr(2); // Remove "o "
-            obj_name = line;
+            mod_name = line;
         }
 
         void get_material_path(std::string line) {
             line = line.substr(7); // Remove "mtllib "
-            path_material = line; // Store the material file path
+            std::string dir = "../models/";
+            path_material = dir + line; // Store the material file path
+            trim(path_material); // Trim whitespace
+            //path_material.pop_back(); // Remove the newline character at the end
+            //std::cout << "Material file path: " << path_material << std::endl;
+            if (!std::filesystem::exists(path_material)) {
+                std::cout << path_material << std::endl;
+                std::cerr << "Please check the path or the file name. You're currently on " << std::filesystem::current_path() << std::endl;
+                return;
+            }
         }
 
         void get_material(std::string line){
             line = line.substr(7); // Remove "usemtl "
             mat.name = line; // Store the material name or path
             std::ifstream matFile(path_material);
-            if (!matFile.is_open()) {
+            if (matFile.fail()) {
                 std::cerr << "Error opening material file: " << path_material << std::endl;
                 return;
             }
-            std::string matLine;
+            std::string matLine = "";
             while (getline(matFile, matLine)) {
                 if (matLine.substr(0, 2) == "Ka") { // Ambient color
                     sscanf(matLine.c_str(), "Ka %f %f %f", &mat.ambient[0], &mat.ambient[1], &mat.ambient[2]);
@@ -255,6 +292,10 @@ class object3D {
                     sscanf(matLine.c_str(), "Ks %f %f %f", &mat.specular[0], &mat.specular[1], &mat.specular[2]);
                 } else if (matLine.substr(0, 2) == "Ns") { // Shininess
                     sscanf(matLine.c_str(), "Ns %f", &mat.shininess);
+                } else if (matLine.substr(0, 6) == "map_Kd") { // Texture map
+                    path_texture = matLine.substr(7); // Remove "map_Kd "
+                    path_texture = "../models/" + path_texture; // Prepend the directory
+                    trim(path_texture); // Remove the newline character at the end
                 }
             }
             matFile.close();
@@ -278,7 +319,7 @@ class object3D {
         }
 
         void get_textures(std::string line, texture* textures, int index_textures){
-            std::string mynum;
+            std::string mynum = "";
 
             line = line.substr(3);
 
@@ -296,7 +337,7 @@ class object3D {
         }
         
         void get_normals(std::string line, normal* normals, int index_normals){
-            std::string mynum;
+            std::string mynum = "";
 
             line = line.substr(3);
 
@@ -330,7 +371,7 @@ class object3D {
                     line = line.substr(j+1);
                     j = 0; // Reset j for the next index
                 }
-                faces[index_faces].add_vertex(index[0], index[1], index[2]);
+                faces[index_faces].add_vertex(index[0], index[2], index[1]);
                 if (line.empty()) return; // If there are no more vertices in the face, break)
             }
         }
@@ -374,73 +415,138 @@ class object3D {
         }
 };
 
+struct VertexKey {
+    unsigned int v, vt, vn;
+    bool operator==(const VertexKey& other) const {
+        return v == other.v && vt == other.vt && vn == other.vn;
+    }
+    // Hash function for std::unordered_map
+    struct Hash {
+        size_t operator()(const VertexKey& k) const {
+            return ((k.v << 16) ^ (k.vt << 8) ^ k.vn);
+        }
+    };
+};
+
 class mesh{
     public:
-        object3D* obj;
-        normal* calculated_normals;
-        vertex* data;
+        model3D* mod = nullptr;
+        vertice* proper_vertices = nullptr;
+        normal* proper_normals = nullptr;
+        texture* proper_textures = nullptr;
+        std::vector<GLuint> indices;
+        std::unordered_map<VertexKey, GLuint, VertexKey::Hash> vertex_map = std::unordered_map<VertexKey, GLuint, VertexKey::Hash>();
+        std::vector<vertex> data;
         GLuint VAO, VBO, EBO;
+        unsigned int textureID;
         
-        mesh() : obj(nullptr) {}
+        mesh() : mod(nullptr) {}
         mesh(const std::string& filename) {
-            obj = new object3D(filename);
+            mod = new model3D(filename);
         }
 
         ~mesh() {
-            delete obj;
+            delete mod;
         }
 
         void set_data() {
-            data = new vertex[obj->num_vertices];
-            for (long long i = 0; i < obj->num_vertices; i++) {
-                data[i] = vertex(obj->vertices[i], calculated_normals[i]);
-                data[i].print(); // Print vertex data for debugging
+            for (long long i = 0; i < mod->num_faces; i++) {
+                for (long long j = 0; j < mod->faces[i].num_vertex; j++) {
+                    VertexKey key{mod->faces[i].vertices[j], 
+                        mod->faces[i].textures[j], 
+                        mod->faces[i].normals[j]};
+                    if (vertex_map.find(key) == vertex_map.end()) {
+                        // If the vertex is not in the map, add it
+                        vertex v(mod->vertices[mod->faces[i].vertices[j] - 1], 
+                            mod->normals[mod->faces[i].normals[j] - 1], 
+                            mod->textures[mod->faces[i].textures[j] - 1]);
+                        data.push_back(v);
+                        vertex_map[key] = data.size() - 1; // Store the index of the new vertex
+                    }
+                    indices.push_back(vertex_map[key]);
+                }
             }
         }
 
         void calculate_normals() {
-            calculated_normals = new normal[obj->num_vertices];
+            proper_normals = new normal[mod->num_vertices];
             // Initialize normals to zero
-            for (long long i = 0; i < obj->num_vertices; i++) {
-                calculated_normals[i] = normal(0.0f, 0.0f, 0.0f);
+            for (long long i = 0; i < mod->num_vertices; i++) {
+                proper_normals[i] = normal(0.0f, 0.0f, 0.0f);
             }
             // Calculate normals for each face
-            for (long long i = 0; i < obj->init_num_faces; i++) {
-                face& f = obj->init_faces[i];
+            for (long long i = 0; i < mod->init_num_faces; i++) {
+                face& f = mod->init_faces[i];
                 if (f.num_vertex < 3) continue; // Skip faces with less than 3 vertices
-                glm::vec3 edge1 = glm::vec3(obj->vertices[f.vertices[1] - 1].x - obj->vertices[f.vertices[0] - 1].x,
-                                                obj->vertices[f.vertices[1] - 1].y - obj->vertices[f.vertices[0] - 1].y,
-                                                obj->vertices[f.vertices[1] - 1].z - obj->vertices[f.vertices[0] - 1].z);
-                glm::vec3 edge2 = glm::vec3(obj->vertices[f.vertices[1] - 1].x - obj->vertices[f.vertices[2] - 1].x,
-                                                obj->vertices[f.vertices[1] - 1].y - obj->vertices[f.vertices[2] - 1].y,
-                                                obj->vertices[f.vertices[1] - 1].z - obj->vertices[f.vertices[2] - 1].z);
+                glm::vec3 edge1 = glm::vec3(mod->vertices[f.vertices[1] - 1].x - mod->vertices[f.vertices[0] - 1].x,
+                                                mod->vertices[f.vertices[1] - 1].y - mod->vertices[f.vertices[0] - 1].y,
+                                                mod->vertices[f.vertices[1] - 1].z - mod->vertices[f.vertices[0] - 1].z);
+                glm::vec3 edge2 = glm::vec3(mod->vertices[f.vertices[1] - 1].x - mod->vertices[f.vertices[2] - 1].x,
+                                                mod->vertices[f.vertices[1] - 1].y - mod->vertices[f.vertices[2] - 1].y,
+                                                mod->vertices[f.vertices[1] - 1].z - mod->vertices[f.vertices[2] - 1].z);
                 
                 glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
 
                 for (int j = 0; j < f.num_vertex; j++) {
                     long long vertex_index = f.vertices[j] - 1; // Convert to zero-based index
-                    calculated_normals[vertex_index].x += normal.x;
-                    calculated_normals[vertex_index].y += normal.y;
-                    calculated_normals[vertex_index].z += normal.z;
+                    proper_normals[vertex_index].x += normal.x;
+                    proper_normals[vertex_index].y += normal.y;
+                    proper_normals[vertex_index].z += normal.z;
                 }
-                
             }
+
             // Normalize the normals
-            for (long long i = 0; i < obj->num_vertices; i++) {
-                float length = glm::length(glm::vec3(calculated_normals[i].x, calculated_normals[i].y, calculated_normals[i].z));
+            for (long long i = 0; i < mod->num_vertices; i++) {
+                float length = glm::length(glm::vec3(proper_normals[i].x, proper_normals[i].y, proper_normals[i].z));
                 if (length > 0.0f) {                
-                    calculated_normals[i].x /= length;
-                    calculated_normals[i].y /= length;
-                    calculated_normals[i].z /= length;
+                    proper_normals[i].x /= length;
+                    proper_normals[i].y /= length;
+                    proper_normals[i].z /= length;
                 } else {
-                    calculated_normals[i] = normal(0.0f, 0.0f, 0.0f); // Set to zero if length is zero
+                    proper_normals[i] = normal(0.0f, 0.0f, 0.0f); // Set to zero if length is zero
                 }
             }
         }
 
-        void setup_mesh(){
-            calculate_normals(); // Calculate normals before setting up the mesh
+        void set_texture(unsigned int i){
+            if(mod->path_texture != "") {
+
+                float borderColor[] = {1.0f, 0.0f, 1.0f, 1.0f}; // Yellow border color
+
+                glGenTextures(1, &textureID);
+                glActiveTexture(GL_TEXTURE0 + i); // Activate texture unit i
+                glBindTexture(GL_TEXTURE_2D, textureID); // Bind the texture
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                
+                int width, height, nrChannels;
+                std::string dir = "../models/";
+                stbi_set_flip_vertically_on_load(true);
+                unsigned char* textureData = stbi_load(dir.append(mod->path_texture).c_str(), &width, &height, &nrChannels, 0);
+                if (textureData) {
+                    GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+                    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, textureData);
+                    std::cout << "Loaded texture: " << mod->path_texture << " with size: " << width << "x" << height << std::endl;
+                    glGenerateMipmap(GL_TEXTURE_2D);
+                } else {
+                    std::cerr << "Failed to load texture: " << mod->path_texture << std::endl;
+                }
+                stbi_image_free(textureData); // Free the texture data
+            } else {
+                std::cout << "No texture provided for mesh: " << mod->path_texture << std::endl;
+                textureID = 0; // Set textureID to 0 if no texture is provided
+            }
+        }
+
+        void setup_mesh(unsigned int i){
+            //calculate_normals(); // Calculate normals before setting up the mesh
             set_data(); // Set the vertex data
+            set_texture(i); // Set the texture if available
 
             glGenVertexArrays(1, &VAO);
             glGenBuffers(1, &VBO);
@@ -448,18 +554,18 @@ class mesh{
 
             glBindVertexArray(VAO); // Make it active
             glBindBuffer(GL_ARRAY_BUFFER, VBO); // Make it active
-            
-            glBufferData(GL_ARRAY_BUFFER, 6*obj->num_vertices * sizeof(float), data, GL_STATIC_DRAW);
+
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vertex)*data.size(), data.data(), GL_STATIC_DRAW);
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * obj->num_faces * sizeof(unsigned int), obj->indices, GL_STATIC_DRAW);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*indices.size(), indices.data(), GL_STATIC_DRAW);
 
             //Defines how vertex data is structured
             glVertexAttribPointer(0,// Attribute location in the shader
                           3,//Number of components per vertex
                           GL_FLOAT,//Data type of each component
                           GL_FALSE,//Normalize integer values to [0,1]
-                          6*sizeof(float),//Byte offset between consecutive attributes
+                          8*sizeof(float),//Byte offset between consecutive attributes
                           nullptr);//Offset from the start of VBO where data begins;
             glEnableVertexAttribArray(0); //Enables the attribute (position)
 
@@ -468,38 +574,60 @@ class mesh{
                           3, // Number of components per normal
                           GL_FLOAT, // Data type of each component
                           GL_FALSE, // Normalize integer values to [0,1]
-                          6*sizeof(float), // Byte offset between consecutive attributes
+                          8*sizeof(float), // Byte offset between consecutive attributes
                           (void*)(3*sizeof(float))); // Offset from the start of VBO where normals begin
             glEnableVertexAttribArray(1); // Enables the attribute (normal)
+
+            // Defines how texture coordinate data is structured
+            glVertexAttribPointer(2, // Attribute location in the shader
+                            2, // Number of components per texture coordinate
+                            GL_FLOAT, // Data type of each component
+                            GL_FALSE, // Normalize integer values to [0,1]
+                            8*sizeof(float), // Byte offset between consecutive attributes
+                            (void*)(6*sizeof(float))); // Offset from the start of VBO where texture coordinates
+            glEnableVertexAttribArray(2); // Enables the attribute (texture coordinates)
+
+            glBindBuffer(GL_ARRAY_BUFFER, 0); // Unbind the VBO
+            glBindVertexArray(0); // Unbind the VAO
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); // Unbind the EBO                        
+                
         }
 
         void draw_mesh(Shader shader) {
 
-            shader.setVec3("material.ambient", obj->mat.ambient[0], obj->mat.ambient[1], obj->mat.ambient[2]);
-            shader.setVec3("material.diffuse", obj->mat.diffuse[0], obj->mat.diffuse[1], obj->mat.diffuse[2]);
-            shader.setVec3("material.specular", obj->mat.specular[0], obj->mat.specular[1], obj->mat.specular[2]);
-            shader.setFloat("material.shininess", obj->mat.shininess);
+            shader.setVec3("material.ambient", mod->mat.ambient[0], mod->mat.ambient[1], mod->mat.ambient[2]);
+            shader.setVec3("material.diffuse", mod->mat.diffuse[0], mod->mat.diffuse[1], mod->mat.diffuse[2]);
+            shader.setVec3("material.specular", mod->mat.specular[0], mod->mat.specular[1], mod->mat.specular[2]);
+            shader.setFloat("material.shininess", mod->mat.shininess);
 
+            if (textureID != 0) {
+                glActiveTexture(GL_TEXTURE0); // Activate texture unit 0
+                glBindTexture(GL_TEXTURE_2D, textureID); // Bind the texture
+                shader.setInt("material.hasTexture", 1); // Set the texture uniform in the shader
+                shader.setInt("OurTexture", 0); // Set the texture unit to 0
+            } else {
+                shader.setInt("material.hasTexture", 0); // No texture
+            }
             glBindVertexArray(VAO); // Bind the VAO
-            //glDrawArrays(GL_TRIANGLES, 0, 6*obj->num_vertices); // Draw the mesh using vertex array
-            glDrawElements(GL_TRIANGLES, 3 * obj->num_faces, GL_UNSIGNED_INT, 0); // Draw the mesh
+            //glDrawArrays(GL_TRIANGLES, 0, 6*mod->num_vertices); // Draw the mesh using vertex array
+            glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0); // Draw the mesh
             glBindVertexArray(0); // Unbind the VAO
         }
 
         void translate(float dx, float dy, float dz) {
-            if (obj) {
-                obj->translate(dx, dy, dz);
+            if (mod) {
+                mod->translate(dx, dy, dz);
             }
         }
 
         void rotate(float theta, float phi, float psi) {
-            if (obj) {
-                obj->rotate(theta, phi, psi);
+            if (mod) {
+                mod->rotate(theta, phi, psi);
             }
         }
 
-        object3D* get_object() const {
-            return obj;
+        model3D* get_model() const {
+            return mod;
         }
 };
 
@@ -533,7 +661,7 @@ class scene {
 
         void start_scene() {
             for (int i = 0; i < num_meshes; i++) {
-                meshes[i]->setup_mesh();    
+                meshes[i]->setup_mesh(i);    
             }
         }
 
