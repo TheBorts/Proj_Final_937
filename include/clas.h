@@ -67,6 +67,26 @@ class face{
             max_num_vertex = 5;
         }
 
+        face& operator=(const face& other) {
+            num_vertex = other.num_vertex;
+            max_num_vertex = other.max_num_vertex;
+            vertices = new GLuint[max_num_vertex];
+            normals = new GLuint[max_num_vertex];
+            textures = new GLuint[max_num_vertex];
+            for (long long i = 0; i < num_vertex; i++) {
+                vertices[i] = other.vertices[i];
+                normals[i] = other.normals[i];
+                textures[i] = other.textures[i];
+            }
+            return *this;
+        }
+
+        ~face() {
+            delete[] vertices;
+            delete[] normals;
+            delete[] textures;
+        }
+
         void add_vertex(int v_index, int n_index, int t_index) {
             if (num_vertex >= max_num_vertex) {
                 max_num_vertex *= 2;
@@ -81,6 +101,7 @@ class face{
                 delete[] vertices;
                 delete[] normals;
                 delete[] textures;
+                
                 vertices = new_vertices;
                 normals = new_normals;
                 textures = new_textures;
@@ -90,6 +111,8 @@ class face{
             textures[num_vertex] = t_index;
             num_vertex++;
         }
+
+        
 };
 
 class vertex{
@@ -102,6 +125,9 @@ class vertex{
             : position(glm::vec3(v.x, v.y, v.z)), normals(glm::vec3(n.x, n.y, n.z)), texture_coords(glm::vec2(0.0f)) {}
         vertex(vertice v, normal n, texture t)
             : position(glm::vec3(v.x, v.y, v.z)), normals(glm::vec3(n.x, n.y, n.z)), texture_coords(glm::vec2(t.u, t.v)) {}
+        vertex(glm::vec3 pos, glm::vec3 norm, glm::vec2 tex)
+            : position(pos), normals(norm), texture_coords(tex) {}
+        
         void print() const {
             std::cout << "Vertex Position: (" << position.x << ", " << position.y << ", " << position.z << ") "
                       << "Normal: (" << normals.x << ", " << normals.y << ", " << normals.z << ") "
@@ -173,6 +199,12 @@ class model3D {
             
             max_num_faces = num_faces;
 
+            if (num_textures == 0) {
+                delete[] textures; // If no textures are defined, delete the texture array
+                textures = new texture[1] ; // Create a default texture
+                textures[0] = texture(0.0f, 0.0f); // Default texture coordinates
+            }
+
             myFile.clear();
             myFile.seekg(0, std::ios::beg);
             
@@ -221,6 +253,15 @@ class model3D {
                 indices[3 * i + 1] = faces[i].vertices[1] - 1;
                 indices[3 * i + 2] = faces[i].vertices[2] - 1;
             }
+        }
+
+        ~model3D() {
+            delete[] vertices;
+            delete[] normals;
+            delete[] textures;
+            delete[] indices;
+            delete[] faces;
+            delete[] init_faces;
         }
 
         void translate(float dx, float dy, float dz) {
@@ -302,7 +343,7 @@ class model3D {
         }
 
         void get_vertices(std::string line, vertice* vertices, int index_vertices){
-            std::string mynum;
+            std::string mynum = "";
 
             line = line.substr(2);
 
@@ -354,7 +395,7 @@ class model3D {
         }
         
         void get_faces(std::string line, face* faces, int index_faces){
-            std::string mynum= "0";
+            std::string mynum= "";
 
             line = line.substr(2);
             line += " "; // Add a space at the end to ensure the last vertex is processed
@@ -366,8 +407,13 @@ class model3D {
                         mynum += line[j];
                         j++;
                     }
-                    index[k] = stoi(mynum);
-                    mynum = "0";
+
+                    if (!mynum.empty()){
+                        index[k] = stoi(mynum);
+                    }else{
+                        index[k] = 1; // Default to 1 if no index is found
+                    }
+                    mynum = "";
                     line = line.substr(j+1);
                     j = 0; // Reset j for the next index
                 }
@@ -376,14 +422,14 @@ class model3D {
             }
         }
 
-        void add_face(face f){
+        void add_face(face& f){
             if (num_faces >= max_num_faces) {
                 max_num_faces *= 2;
                 face* new_faces = new face[max_num_faces];
                 for (long long i = 0; i < num_faces; i++) {
                     new_faces[i] = faces[i];
                 }
-                delete[] faces;
+                delete[] faces; // Free the old array
                 faces = new_faces;
             }
             faces[num_faces++] = f;
@@ -406,9 +452,19 @@ class model3D {
                         n_face.add_vertex(first_vertex, faces[i].normals[0], faces[i].textures[0]);
                         n_face.add_vertex(faces[i].vertices[j], faces[i].normals[j], faces[i].textures[j]);
                         n_face.add_vertex(faces[i].vertices[j + 1], faces[i].normals[j + 1], faces[i].textures[j + 1]);
+                        
+                        
+                        
                         add_face(n_face);
+
+
+
+
                     }
 
+                    delete [] faces[i].vertices;
+                    delete [] faces[i].normals;
+                    delete [] faces[i].textures;
                     faces[i] = last_face; // Replace the original face with the first triangle
                 }
             }
@@ -434,9 +490,9 @@ class mesh{
         vertice* proper_vertices = nullptr;
         normal* proper_normals = nullptr;
         texture* proper_textures = nullptr;
-        std::vector<GLuint> indices;
         std::unordered_map<VertexKey, GLuint, VertexKey::Hash> vertex_map = std::unordered_map<VertexKey, GLuint, VertexKey::Hash>();
-        std::vector<vertex> data;
+        std::vector<GLuint> indices = std::vector<GLuint>();
+        std::vector<vertex> data = std::vector<vertex>();
         GLuint VAO, VBO, EBO;
         unsigned int textureID;
         
@@ -446,29 +502,48 @@ class mesh{
         }
 
         ~mesh() {
-            delete mod;
+           
+            if (mod) delete mod; // Clean up the model3D object
+            delete[] proper_vertices; // Clean up vertices
+            delete[] proper_normals; // Clean up normals
+            delete[] proper_textures; // Clean up textures
+
+            glDeleteVertexArrays(1, &VAO); // Delete the Vertex Array Object
+            glDeleteBuffers(1, &VBO); // Delete the Vertex Buffer Object
+            glDeleteBuffers(1, &EBO); // Delete the Element Buffer Object
+            if (textureID) {
+                glDeleteTextures(1, &textureID); // Delete the texture if it exists
+            }
         }
 
         void set_data() {
             for (long long i = 0; i < mod->num_faces; i++) {
-                for (long long j = 0; j < mod->faces[i].num_vertex; j++) {
+                for (long long j = 0; j < mod->faces[i].num_vertex; j++) {                    
                     VertexKey key{mod->faces[i].vertices[j], 
                         mod->faces[i].textures[j], 
                         mod->faces[i].normals[j]};
                     if (vertex_map.find(key) == vertex_map.end()) {
                         // If the vertex is not in the map, add it
                         vertex v(mod->vertices[mod->faces[i].vertices[j] - 1], 
-                            mod->normals[mod->faces[i].normals[j] - 1], 
+                            proper_normals[mod->faces[i].vertices[j] - 1], 
                             mod->textures[mod->faces[i].textures[j] - 1]);
-                        data.push_back(v);
-                        vertex_map[key] = data.size() - 1; // Store the index of the new vertex
+                            data.push_back(v);
+                            vertex_map[key] = data.size() - 1; // Store the index of the new vertex
                     }
                     indices.push_back(vertex_map[key]);
                 }
             }
         }
 
-        void calculate_normals() {
+        void calculate_normals(){
+            std::vector<glm::vec3> verts =  std::vector<glm::vec3>(mod->num_vertices);
+            for (long long i = 0; i < mod->num_vertices; i++) {
+                verts[i] = glm::vec3(mod->vertices[i].x, mod->vertices[i].y, mod->vertices[i].z);
+            }
+            calculate_normals(verts); // Calculate normals using the vertex positions
+        }
+
+        void calculate_normals(std::vector<glm::vec3> verts) {
             proper_normals = new normal[mod->num_vertices];
             // Initialize normals to zero
             for (long long i = 0; i < mod->num_vertices; i++) {
@@ -478,12 +553,12 @@ class mesh{
             for (long long i = 0; i < mod->init_num_faces; i++) {
                 face& f = mod->init_faces[i];
                 if (f.num_vertex < 3) continue; // Skip faces with less than 3 vertices
-                glm::vec3 edge1 = glm::vec3(mod->vertices[f.vertices[1] - 1].x - mod->vertices[f.vertices[0] - 1].x,
-                                                mod->vertices[f.vertices[1] - 1].y - mod->vertices[f.vertices[0] - 1].y,
-                                                mod->vertices[f.vertices[1] - 1].z - mod->vertices[f.vertices[0] - 1].z);
-                glm::vec3 edge2 = glm::vec3(mod->vertices[f.vertices[1] - 1].x - mod->vertices[f.vertices[2] - 1].x,
-                                                mod->vertices[f.vertices[1] - 1].y - mod->vertices[f.vertices[2] - 1].y,
-                                                mod->vertices[f.vertices[1] - 1].z - mod->vertices[f.vertices[2] - 1].z);
+                glm::vec3 edge1 = glm::vec3(verts[f.vertices[1] - 1].x - verts[f.vertices[0] - 1].x,
+                                                verts[f.vertices[1] - 1].y - verts[f.vertices[0] - 1].y,
+                                                verts[f.vertices[1] - 1].z - verts[f.vertices[0] - 1].z);
+                glm::vec3 edge2 = glm::vec3(verts[f.vertices[1] - 1].x - verts[f.vertices[2] - 1].x,
+                                                verts[f.vertices[1] - 1].y - verts[f.vertices[2] - 1].y,
+                                                verts[f.vertices[1] - 1].z - verts[f.vertices[2] - 1].z);
                 
                 glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
 
@@ -511,16 +586,16 @@ class mesh{
         void set_texture(unsigned int i){
             if(mod->path_texture != "") {
 
-                float borderColor[] = {1.0f, 0.0f, 1.0f, 1.0f}; // Yellow border color
+                //float borderColor[] = {1.0f, 0.0f, 1.0f, 1.0f}; // Yellow border color
 
                 glGenTextures(1, &textureID);
                 glActiveTexture(GL_TEXTURE0 + i); // Activate texture unit i
                 glBindTexture(GL_TEXTURE_2D, textureID); // Bind the texture
-                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
-                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+                //glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 
@@ -544,10 +619,9 @@ class mesh{
         }
 
         void setup_mesh(unsigned int i){
-            //calculate_normals(); // Calculate normals before setting up the mesh
+            calculate_normals(); // Calculate normals before setting up the mesh
             set_data(); // Set the vertex data
             set_texture(i); // Set the texture if available
-
             glGenVertexArrays(1, &VAO);
             glGenBuffers(1, &VBO);
             glGenBuffers(1, &EBO);
@@ -593,6 +667,35 @@ class mesh{
                 
         }
 
+        void update_data(std::vector<glm::vec3> verts) {
+            if (proper_normals) {
+                delete[] proper_normals; // Free existing normals if they exist
+                proper_normals = nullptr; // Set to nullptr to avoid dangling pointer
+            }
+            calculate_normals(verts); // Calculate normals based on the vertices
+            data.clear(); // Clear existing data
+            vertex_map.clear(); // Clear the vertex map
+            data = std::vector<vertex>(); // Reinitialize the data vector
+            vertex_map = std::unordered_map<VertexKey, GLuint, VertexKey::Hash>(); // Reinitialize the vertex map
+            for (long long i = 0; i < mod->num_faces; i++) {
+                for (long long j = 0; j < mod->faces[i].num_vertex; j++) {
+                    VertexKey key{mod->faces[i].vertices[j], 
+                        mod->faces[i].textures[j], 
+                        mod->faces[i].normals[j]};
+                    if (vertex_map.find(key) == vertex_map.end()) {
+                        // If the vertex is not in the map, add it
+                        vertex v(verts[mod->faces[i].vertices[j] - 1],
+                            glm::vec3(proper_normals[mod->faces[i].vertices[j] - 1].x, 
+                                      proper_normals[mod->faces[i].vertices[j] - 1].y, 
+                                      proper_normals[mod->faces[i].vertices[j] - 1].z),
+                            glm::vec2(mod->textures[mod->faces[i].textures[j] - 1].u, mod->textures[mod->faces[i].textures[j] - 1].v));
+                        data.push_back(v);
+                        vertex_map[key] = data.size() - 1; // Store the index of the new vertex
+                    }
+                }
+            }
+        }
+
         void draw_mesh(Shader shader) {
 
             shader.setVec3("material.ambient", mod->mat.ambient[0], mod->mat.ambient[1], mod->mat.ambient[2]);
@@ -608,7 +711,12 @@ class mesh{
             } else {
                 shader.setInt("material.hasTexture", 0); // No texture
             }
+            
             glBindVertexArray(VAO); // Bind the VAO
+            if (proper_normals) {
+                glBindBuffer(GL_ARRAY_BUFFER, VBO); // Bind the VBO
+                glBufferData(GL_ARRAY_BUFFER, sizeof(vertex) * data.size(), data.data(), GL_STATIC_DRAW); // Update the VBO with new data
+            }
             //glDrawArrays(GL_TRIANGLES, 0, 6*mod->num_vertices); // Draw the mesh using vertex array
             glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0); // Draw the mesh
             glBindVertexArray(0); // Unbind the VAO
@@ -640,36 +748,6 @@ class lightSource {
         lightSource() : position{0.0f, 0.0f, 0.0f}, ambient{0.2f, 0.2f, 0.2f}, diffuse{0.8f, 0.8f, 0.8f}, specular{1.0f, 1.0f, 1.0f} {}
         lightSource(float x, float y, float z, float ar, float ag, float ab, float dr, float dg, float db, float sr, float sg, float sb) 
             : position{x, y, z}, ambient{ar, ag, ab}, diffuse{dr, dg, db}, specular{sr, sg, sb} {}
-};
-
-class scene {
-    public:
-        mesh** meshes;
-        int num_meshes;
-        scene() : meshes(nullptr), num_meshes(0) {}
-        
-        void add_mesh(const std::string& filename) {
-            mesh** new_meshes = new mesh*[num_meshes + 1];
-            for (int i = 0; i < num_meshes; i++) {
-                new_meshes[i] = meshes[i];
-            }
-            new_meshes[num_meshes] = new mesh(filename);
-            delete[] meshes;
-            meshes = new_meshes;
-            num_meshes++;
-        }
-
-        void start_scene() {
-            for (int i = 0; i < num_meshes; i++) {
-                meshes[i]->setup_mesh(i);    
-            }
-        }
-
-        void draw_scene(Shader shader) {
-            for (int i = 0; i < num_meshes; i++) {
-                meshes[i]->draw_mesh(shader);
-            }
-        }
 };
 
 #endif

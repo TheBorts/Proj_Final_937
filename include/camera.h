@@ -84,6 +84,8 @@ class camera{
                 Position -= Right * velocity;
             if (direction == RIGHT)
                 Position += Right * velocity;
+
+            Position.y = 1.0f; // Prevent camera from going below ground level
         }
 
     private:

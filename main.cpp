@@ -20,14 +20,11 @@ using namespace std;
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-camera cam(glm::vec3(4.0f, 0.0f, 0.0f));
+camera cam(glm::vec3(4.0f, 1.0f, 0.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
-// timing
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -111,22 +108,28 @@ int main(int argc, char** argv)
     
     // OpenGL begins here
 
-    scene myScene = scene();
+    world myWorld = world();
 
     for (int i = 1; i < argc; i++) {
-        myScene.add_mesh(argv[i]);
+        myWorld.add_object(argv[i]);
     }
-
-    lightSource light = lightSource(400.0f, 0.0f, 0.0f, 0.3f, 0.3f, 0.3f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
-
+    
+    lightSource light = lightSource(30.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 1.0f);
+    
     Shader meuShader("../shaders/myshader.vs", "../shaders/myshader.fs");
     //Shader meuShader("../shaders/light.vs", "../shaders/light.fs");
     
-    myScene.start_scene();
-
+    myWorld.objs[1]->tree->m->mod->translate(0.0f, 5.0f, 0.0f);
+    myWorld.objs[1]->set_positions();
+    myWorld.objs[1]->isVertStatic = std::vector<bool>(myWorld.objs[1]->position.size(), false); // Initialize all vertices as static
+    myWorld.objs[1]->isVertStatic[0] = true; // Make the first vertex static
+    myWorld.objs[1]->isStatic = false;
+    myWorld.start_world();
+    
     // Set up the viewport
     glViewport(0, 0, 800, 600);
-    
+    int width, height;
+
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);  // Fragments closer to the camera overwrite farther ones
 
@@ -134,23 +137,44 @@ int main(int argc, char** argv)
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Uncomment to enable wireframe
 
     /* Loop until the user closes the window */
+    long long frameCount = 0;
+    bool saveFrames = true;
+    
+    int sceneIndex = 1;
+    std::string path = "../scenes/scene" + std::to_string(sceneIndex);
+    std::filesystem::create_directory(path);
+    std::string pseudoObjPath = path + "/frame";
+    std::string mtlPath = "../scenes/scene" + std::to_string(sceneIndex) + "/scene.mtl";
+    writer saver(pseudoObjPath + std::to_string(frameCount) + ".obj", mtlPath);
+
+    if (saveFrames){
+        saver.writeMTL(myWorld);
+    }
+
+    std::cout << "Starting simulation..." << std::endl;
+
     while (!glfwWindowShouldClose(window))
     {
-
+        if (saveFrames && frameCount < 10){
+            saver.setPaths(pseudoObjPath + std::to_string(frameCount) + ".obj", mtlPath);
+            saver.writeOBJ(myWorld);
+        }
+        frameCount++;
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+
         processInput(window);
+        glfwGetFramebufferSize(window, &width, &height);
 
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
         meuShader.use();
         
         glm::mat4 view = cam.getViewMatrix();
-        glm::mat4 projection = glm::perspective(glm::radians(cam.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 800.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(cam.Zoom), (float)width / (float)height, 0.1f, 3000.0f);
         glm::mat4 model = glm::mat4(1.0f);
 
         meuShader.setMat4("view", view);
@@ -158,12 +182,12 @@ int main(int argc, char** argv)
         meuShader.setMat4("model", model);
         meuShader.setVec3("viewPos", cam.Position);
         
-        meuShader.setVec3("lightPos", light.position[0], light.position[1], light.position[2]);
+        meuShader.setVec3("light.position", light.position[0], light.position[1], light.position[2]);
         meuShader.setVec3("light.ambient", light.ambient[0], light.ambient[1], light.ambient[2]);
         meuShader.setVec3("light.diffuse", light.diffuse[0], light.diffuse[1], light.diffuse[2]);
         meuShader.setVec3("light.specular", light.specular[0], light.specular[1], light.specular[2]);
-
-        myScene.draw_scene(meuShader);
+        
+        myWorld.draw_world(meuShader);
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
@@ -174,6 +198,8 @@ int main(int argc, char** argv)
     }
 
     glfwTerminate();
-    
+
+    //free resources
+
     return 0;
 }
