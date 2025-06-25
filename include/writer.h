@@ -8,6 +8,7 @@
 #include "physics.h"
 #include "shaders.h"
 
+// Writer class to handle writing OBJ and MTL files
 class writer {
     public:
         std::string objPath;

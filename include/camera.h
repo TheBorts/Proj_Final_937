@@ -34,6 +34,7 @@ class camera{
         float MouseSense;
         float Zoom;
 
+        // Default constructor
         camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) : MoveSpeed(SPEED), MouseSense(SENSITIVITY), Zoom(ZOOM){
             Position = position;
             WorldUp = up;
@@ -53,10 +54,12 @@ class camera{
             updateCameraVectors();
         }
 
+        // Returns the view matrix
         glm::mat4 getViewMatrix(){
             return glm::lookAt(Position, Position + Front, Up);
         }
 
+        // Processes input from mouse movement
         void ProcessMouseMove(float xoffset, float yoffset, GLboolean constrainPitch = true) {
             xoffset *= MouseSense;
             yoffset *= MouseSense;
@@ -74,6 +77,7 @@ class camera{
             updateCameraVectors();
         }
 
+        // Processes input from mouse scroll
         void ProcessKeyboard(camera_Movement direction, float deltaTime){
             float velocity = MoveSpeed * deltaTime;
             if (direction == FORWARD)
@@ -90,6 +94,7 @@ class camera{
 
     private:
         
+        // Updates the camera vectors based on the current yaw and pitch
         void updateCameraVectors(){
             glm::vec3 front;
             front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));

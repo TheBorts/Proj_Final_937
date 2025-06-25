@@ -12,6 +12,7 @@
 
 #include "shaders.h"
 
+// Class to represent a material with properties like ambient, diffuse, specular colors and shininess
 class material {
     public:
         std::string name;
@@ -26,6 +27,7 @@ class material {
             : name(nam),ambient{ar, ag, ab}, diffuse{dr, dg, db}, specular{sr, sg, sb}, shininess(sh) {}
 };
 
+// Class to represent a vertex in 3D space. Hella dumb because i could have used glm::vec3
 class vertice{
     public:
         float x = 0, y = 0, z = 0;
@@ -33,6 +35,7 @@ class vertice{
         vertice(float x, float y, float z) : x(x), y(y), z(z) {}
 };
 
+// Class to represent a normal vector in 3D space. Stupidly dumb aswell, could have used glm::vec3
 class normal{
     public:
         float x, y, z;
@@ -40,6 +43,7 @@ class normal{
         normal(float x, float y, float z) : x(x), y(y), z(z) {}
     };
 
+// God forbid a man to use a vec3......
 class texture{
     public:
         float u, v, w;
@@ -49,6 +53,7 @@ class texture{
         texture(float u, float v, float w) : u(u), v(v), w(w) {}
 };
 
+// Class to represent a face in the model, which consists of vertices, normals, and texture coordinates.
 class face{
     public:
 
@@ -115,6 +120,7 @@ class face{
         
 };
 
+// Class that stores the information in proper order to pass it to OpenGL for rendering.
 class vertex{
     public:
         glm::vec3 position;
@@ -138,6 +144,7 @@ class vertex{
         }
 };
 
+// Class that represents a 3D model, which contains vertices, normals, textures, and faces.
 class model3D {
     public:
         vertice* vertices = nullptr;
@@ -471,6 +478,9 @@ class model3D {
         }
 };
 
+// Struct to represent a key for vertices in the mesh, which includes vertex index, texture index, and normal index.
+// This is used to ensure that each unique vertex is only stored once in the vertex buffer.
+// Dont think it is making that much of a difference in the code but there was a time where it was GOATED
 struct VertexKey {
     unsigned int v, vt, vn;
     bool operator==(const VertexKey& other) const {
@@ -484,6 +494,7 @@ struct VertexKey {
     };
 };
 
+// Class that represents a mesh, which contains a model3D object and the necessary OpenGL buffers for rendering.
 class mesh{
     public:
         model3D* mod = nullptr;
@@ -740,6 +751,7 @@ class mesh{
         }
 };
 
+// Class to represent a light source, which contains properties like ambient, diffuse, specular colors, and shininess.
 class lightSource {
     public:
         float position[3];

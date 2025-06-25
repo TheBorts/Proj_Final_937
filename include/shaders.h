@@ -10,6 +10,8 @@
 #include <sstream>
 #include <iostream>
 
+// class Shader
+// This class is responsible for loading, compiling, and linking shaders from source files.
 class Shader {
 public:
     unsigned int ID;

@@ -16,15 +16,19 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 glm::vec3 gravity(0.0f, -0.5f, 0.0f); // Gravity std::vector
 
+// Class that represents a 3D object in the physics simulation
 class object{
     public:
+        // Pointer to the mesh with the 3D model data and the connection to openGl
         mesh* m = nullptr;
         
+        // Vectors to store the positions and velocities of the vertices
         std::vector<glm::vec3> position;
         std::vector<glm::vec3> velocity;
 
-        bool isStatic = true; // Indicates if the object is static or dynamic
-        std::vector<bool> isVertStatic; // Indicates if the object is static or dynamic
+        // Flags to indicate if the object is static or dynamic
+        bool isStatic = true; 
+        std::vector<bool> isVertStatic;
 
         float mass = 1.0f; // Default mass for the object
         float springRestitution = 5.0f; // Default restitution for the object
@@ -34,7 +38,7 @@ class object{
         float dragCoefficient = 0.47f; // Default drag coefficient for the object
         float restitution = 0.5f; // Default restitution for the object
 
-
+        // Constructor to initialize the object with a mesh from a file
         object(const std::string& filename) {
             m = new mesh(filename);
             for (long long i = 0; i < m->mod->num_vertices; i++) {
@@ -47,12 +51,14 @@ class object{
             
         }
 
+        // Default destructor
         ~object() {
             if (m) {
                 delete m; // Clean up
             }
         }
 
+        // Function to set the positions of the vertices based on the mesh data
         void set_positions(){
             for (long long i = 0; i < m->mod->num_vertices; i++) {
                 position[i] = glm::vec3(m->mod->vertices[i].x, 
@@ -61,6 +67,7 @@ class object{
             }
         }
 
+        // Function to update the velocities of the vertices based on the physics simulation
         void calculate_forces() {
             if (isStatic) return; // Skip force calculations for static objects
             // using every edge as a spring
@@ -92,6 +99,8 @@ class object{
                 // Apply damping
                 velocity[v1_index] *= (1.0f - linearDamping);
 
+                // Cheat to prevent objects from falling through the ground
+                // This is a very simple collision detection and response
                 if (position[v1_index].y < -0.9f) { // Simple ground collision
                     position[v1_index].y = -0.9f; // Reset position to ground level
                     velocity[v1_index].y = -velocity[v1_index].y * restitution; // Reverse velocity with restitution
@@ -99,6 +108,8 @@ class object{
             }
         }
 
+        // Function to update the positions of the vertices based on the velocities
+        // This function also skips updates for static objects and static vertices
         void update_positions() {
             if (isStatic) return; // Skip position updates for static objects
             for (size_t i = 0; i < position.size(); i++) {
@@ -107,22 +118,33 @@ class object{
             }
         }
 
+        // Function to update the mesh data and draw the object
         void draw(Shader shader) {
             m->update_data(position);
             m->draw_mesh(shader);
         }
-};       
+};
 
+// Class that represents an Axis-Aligned Bounding Box (AABB) for collision detection
 class AABB {
     public:
+
+        // Minimum and maximum coordinates of the AABB
         glm::vec3 min;
         glm::vec3 max;
-        long long num_faces = 0; // Number of faces contained within this AABB
-        std::vector<face*> faces; // Faces contained within this AABB
-        object* obj = nullptr; // Pointer to the object this AABB represents
-        AABB* children[2] = {nullptr}; // Pointers to child AABBs for octree structure
-        bool isLeaf = true; // Indicates if this AABB is a leaf node in the octree
 
+        // Number of faces contained within this AABB and a vector to store them
+        long long num_faces = 0;
+        std::vector<face*> faces;
+
+        // Pointers to the object this AABB represents and its children
+        object* obj = nullptr;
+        AABB* children[2] = {nullptr};
+
+        // Flag to indicate if this AABB is a leaf node in the octree
+        bool isLeaf = true;
+
+        // Default constructor initializes an empty AABB
         AABB() : obj(nullptr), min(glm::vec3(0.0f)), max(glm::vec3(0.0f)) {
             
             for (int i = 0; i < 2; ++i) {
@@ -133,15 +155,16 @@ class AABB {
             faces =  std::vector<face*>();
         }
 
+        // Constructor that initializes the AABB with an object from a file
         AABB(const std::string& filename) {
             obj = new object(filename);
             isLeaf = true; // Initially set to leaf
             set_faces();
             calculate_bounds();
             generate_children();
-            std::cout << "Total de folhas: " << calc_faces() << std::endl;
         }
 
+        // Destructor to clean up the AABB and its children
         ~AABB() {
             for (int i = 0; i < 2; ++i) {
                 if (children[i]) {
@@ -150,17 +173,20 @@ class AABB {
             }
         }
 
+        // Function to set the faces of the AABB based on the object's mesh
         void set_positions() {
             if (!obj) return;
             obj->set_positions();
         }
 
+        // Function that detects collisions between this AABB and another AABB
         void detect_collision(AABB* other, std::vector<face*>& collision_faces) {
             if (!other || !obj || !other->obj) return;
 
 
             //std::cout << min.x << ' ' << min.y << ' ' << min.z << ' ' << max.x << ' ' << max.y << ' ' << max.z << std::endl;
             //std::cout << other->min.x << ' ' << other->min.y << ' ' << other->min.z << ' ' << other->max.x << ' ' << other->max.y << ' ' << other->max.z << std::endl;
+            
             // Check for overlap in AABBs
             if (min.x > other->max.x || max.x < other->min.x ||
                 min.y > other->max.y || max.y < other->min.y ||
@@ -169,10 +195,12 @@ class AABB {
             }
 
             // If this AABB is a leaf node, check its faces against the other's faces
-            std::cout << "AABB 1 is leaf? " << (num_faces < 20 ? "Yes" : "No") << std::endl;
+            //std::cout << "AABB 1 is leaf? " << (num_faces < 20 ? "Yes" : "No") << std::endl;
             //std::cout << "AABB 1 faces count: " << num_faces << std::endl;
-            std::cout << "AABB 2 is leaf? " << (other->num_faces < 20 ? "Yes" : "No") << std::endl;
+            //std::cout << "AABB 2 is leaf? " << (other->num_faces < 20 ? "Yes" : "No") << std::endl;
             //std::cout << "AABB 2 faces count: " << other->num_faces << std::endl;
+            
+            // If both AABBs are leaf nodes, check their faces for collision
             if (num_faces <= 20 and other->num_faces <= 20) {
                 //std::cout << "Both AABBs are leaf nodes, checking faces for collision." << std::endl;
                 for (const auto& f : faces) {
@@ -192,6 +220,7 @@ class AABB {
             } else {
                 // If not leaf, check children recursively
                 
+                //Generate children now to spare useless recursion
                 if (num_faces > 20 && num_faces >= other->num_faces){
                     generate_children();
                     other->detect_collision(children[0], collision_faces);
@@ -204,6 +233,7 @@ class AABB {
             }
         }
 
+        // Function to return the number of faces in the leaf nodes of the AABB
         int calc_faces(){
             if (isLeaf){
                 return num_faces;
@@ -212,6 +242,7 @@ class AABB {
             return children[0]->calc_faces() + children[1]->calc_faces();
         }
 
+        // Function to identify if two triangles intersect
         bool triangleTriangleIntersectionComplete(const glm::vec3 tr1[3], const glm::vec3 tr2[3]) {
 
             glm::vec3 normal1 = glm::cross(tr1[1] - tr1[0], tr1[2] - tr1[0]);
@@ -299,6 +330,7 @@ class AABB {
             return true;
         }
 
+        // Function to calculate the bounds of the AABB based on the faces it contains
         void calculate_bounds() {
             if (!obj->m) return;
 
@@ -318,6 +350,7 @@ class AABB {
 
     private:
 
+        // Function to set the faces of the AABB based on the object's mesh
         void set_faces(){
             for (int i = 0; i < obj->m->mod->num_faces; i++) {
                 face* f = &obj->m->mod->faces[i];
@@ -326,12 +359,14 @@ class AABB {
             }
         }
 
+        // Function to check if a point is contained within the AABB
         bool contains(const glm::vec3& point) const {
             return (point.x >= min.x && point.x <= max.x) &&
                 (point.y >= min.y && point.y <= max.y) &&
                 (point.z >= min.z && point.z <= max.z);
         }
 
+        // Funtion to find the faces that are inherited from the parent AABB
         void find_faces(std::vector<face*>& faces_pai, long long& num_faces_pai) {
             if (!obj->m) return;
             
@@ -357,6 +392,7 @@ class AABB {
             }
         }
 
+        // Function to generate child AABBs by splitting the current AABB
         void generate_children() {
             if (!obj->m) return;
 
@@ -433,14 +469,18 @@ class AABB {
         }
 };
 
+// Class that represents the world containing multiple AABBs
 class world {
     public:
         AABB** trees;
         int num_tr = 0;
+
+        // Default constructor initializes the world with no trees
         world(){
             trees = nullptr;
         }
 
+        // Destructor to clean up the world and its trees
         ~world() {
             for (int i = 0; i < num_tr; i++) {
                 AABB* tr = trees[i];
@@ -452,6 +492,7 @@ class world {
             delete[] trees; // Clean up the array of objects
         }
 
+        // Function to add a new tree (AABB) to the world
         void add_tree(const std::string& filename) {
             AABB** new_tr = new AABB*[num_tr + 1];
             for (int i = 0; i < num_tr; i++) {
@@ -463,6 +504,7 @@ class world {
             num_tr++;
         }
 
+        // Function to initialize the world with a given number of trees
         void start_world() {
             for (int i = 0; i < num_tr; i++) {
                 AABB* tr = trees[i];
@@ -470,15 +512,19 @@ class world {
             }
         }
 
+        // Function to draw the world using a given shader
         void draw_world(Shader shader) {
             update_world(); // Update positions and forces before drawing
 
             for (int i = 0; i < num_tr; i++) {
+                // We pass the shader to the object's draw function so that we can pass uniform variables
                 trees[i]->obj->draw(shader);
             }
 
         }
 
+        // Function to update the world by calculating forces and updating positions of all trees
+        // It also detects collisions after updating positions
         void update_world() {
             for (int i = 0; i < num_tr; i++) {
                 trees[i]->obj->calculate_forces();
@@ -488,6 +534,9 @@ class world {
             detect_collisions(); // Detect collisions after updating positions
         }
 
+        // Function to detect collisions between all trees in the world
+        // It checks for collisions only between non-static objects
+        // If a collision is detected, both objects involved are marked as static
         void detect_collisions() {
             for (int i = 0; i < num_tr; i++) {
                 AABB* tr1 = trees[i];
@@ -499,16 +548,12 @@ class world {
                     std::vector<face*> collision_faces = std::vector<face*>();
                     tr1->detect_collision(tr2, collision_faces);
                     if (!collision_faces.empty()) {
-                        std::cout << "Colidiu putaquepariu" << std::endl;
                         tr1->obj->isStatic = true; 
                         tr2->obj->isStatic = true;
                     }
                 }
             }
         }
-
-
-
 };
 
 

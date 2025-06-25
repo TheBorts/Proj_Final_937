@@ -26,12 +26,13 @@ float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
-
+// Callback function to handle window resizing
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
 }  
 
+// Callback function to handle mouse movement
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
     
     float xpos = static_cast<float>(xposIn);
@@ -53,6 +54,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
     cam.ProcessMouseMove(xoffset, yoffset);
 }
 
+// Function to process input from the keyboard
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -108,34 +110,35 @@ int main(int argc, char** argv)
         return -1;
     }
     
-    // OpenGL begins here
-
+    // Initialize world
     world myWorld = world();
 
+    // Get models from command line arguments
     for (int i = 1; i < argc; i++) {
         myWorld.add_tree(argv[i]);
     }
     
+    // Imposes a light source in the scene
     lightSource light = lightSource(20.0f, 3.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 1.0f, 0.5f, 1.0f);
     
+    // Set up the shader
     Shader meuShader("../shaders/myshader.vs", "../shaders/myshader.fs");
-    //Shader meuShader("../shaders/light.vs", "../shaders/light.fs");
-    
-    //myWorld.objs[0]->tree->m->mod->rotate(30.0f, 90.0f, 0.0f);
-    //myWorld.objs[0]->set_positions();
 
 
+    // Set up the scene
+
+    // slighly sideways cube that falls on the sphere
     myWorld.trees[1]->obj->m->mod->rotate(45.0f, 0.0f, 0.0f);
     myWorld.trees[1]->obj->m->mod->translate(0.0f, 5.0f, 2.0f);
     myWorld.trees[1]->set_positions();
     myWorld.trees[1]->obj->isVertStatic = std::vector<bool>(myWorld.trees[1]->obj->position.size(), false); // Initialize all vertices as static
-    //myWorld.trees[1]->obj->isVertStatic[0] = true; // Make the first vertex static
     myWorld.trees[1]->obj->isStatic = false;
     
+    // Big bunny for seing phong illumination
     myWorld.trees[3]->obj->m->mod->translate(0.0f, 200.0f, 800.0f);
     myWorld.trees[3]->set_positions();
     
-
+    // Cube that is being hung by one vertex
     myWorld.trees[4]->obj->m->mod->translate(0.0f, 4.0f, 10.0f);
     myWorld.trees[4]->set_positions();
     myWorld.trees[4]->obj->isVertStatic = std::vector<bool>(myWorld.trees[4]->obj->position.size(), false); // Initialize all vertices as static
@@ -143,11 +146,13 @@ int main(int argc, char** argv)
     myWorld.trees[4]->obj->isVertStatic[0] = true; // Make the first vertex static
     myWorld.trees[4]->obj->springRestitution = 1.0f; // Set spring restitution for the object
 
+    // Cube that falls on the floor
     myWorld.trees[5]->obj->m->mod->translate(0.0f, 4.0f, -10.0f);
     myWorld.trees[5]->set_positions();
     myWorld.trees[5]->obj->isVertStatic = std::vector<bool>(myWorld.trees[5]->obj->position.size(), false); // Initialize all vertices as static
     myWorld.trees[5]->obj->isStatic = false;
     
+    // Starts the world simulation
     myWorld.start_world();
 
 
@@ -161,17 +166,19 @@ int main(int argc, char** argv)
     // Enable wireframe mode for debugging
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Uncomment to enable wireframe
 
-    /* Loop until the user closes the window */
-    long long frameCount = 0;
+    // If you want to save frames, set this to true and select a scene index
     bool saveFrames = false;
-    
     int sceneIndex = 1;
+    
+    long long frameCount = 0;
+    
     std::string path = "../scenes/scene" + std::to_string(sceneIndex);
     std::filesystem::create_directory(path);
     std::string pseudoObjPath = path + "/frame";
     std::string mtlPath = "../scenes/scene" + std::to_string(sceneIndex) + "/scene.mtl";
     writer saver(pseudoObjPath + std::to_string(frameCount) + ".obj", mtlPath);
 
+    // Save the MTL file only once at the beginning
     if (saveFrames){
         saver.writeMTL(myWorld);
     }
@@ -180,24 +187,30 @@ int main(int argc, char** argv)
 
     while (!glfwWindowShouldClose(window))
     {
+        // If we want to save frames, write the OBJ file every frame
         if (saveFrames && frameCount < 10){
             saver.setPaths(pseudoObjPath + std::to_string(frameCount) + ".obj", mtlPath);
             saver.writeOBJ(myWorld);
         }
+        
         frameCount++;
         
+        // Makes the time pass
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+        // Process input
         processInput(window);
         glfwGetFramebufferSize(window, &width, &height);
 
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        //starts the shader
         meuShader.use();
         
+        // Passes  the camera and light parameters to the shader
         glm::mat4 view = cam.getViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(cam.Zoom), (float)width / (float)height, 0.1f, 3000.0f);
         glm::mat4 model = glm::mat4(1.0f);
@@ -212,6 +225,7 @@ int main(int argc, char** argv)
         meuShader.setVec3("light.diffuse", light.diffuse[0], light.diffuse[1], light.diffuse[2]);
         meuShader.setVec3("light.specular", light.specular[0], light.specular[1], light.specular[2]);
         
+        // Draw the world
         myWorld.draw_world(meuShader);
 
         /* Swap front and back buffers */
@@ -219,12 +233,6 @@ int main(int argc, char** argv)
         
         /* Poll for and process events */
         glfwPollEvents();
-        
-        if (frameCount == 1000) {
-            myWorld.trees[1]->obj->isVertStatic[0] = false; // Make the first vertex dynamic after 1000 frames
-        }
-
-
     }
 
     glfwTerminate();
