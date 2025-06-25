@@ -14,6 +14,7 @@
 #include "include/camera.h"
 #include "include/clas.h"
 #include "include/physics.h"
+#include "include/writer.h"
 
 using namespace std;
 
@@ -75,6 +76,7 @@ int main(int argc, char** argv)
     {
         return -1;
     }
+
     glEnable(GL_CULL_FACE);  // Enable face culling
     glCullFace(GL_BACK);     // Cull back faces (default)
     glFrontFace(GL_CCW);     // Set counter-clockwise winding order as front-facing
@@ -111,21 +113,44 @@ int main(int argc, char** argv)
     world myWorld = world();
 
     for (int i = 1; i < argc; i++) {
-        myWorld.add_object(argv[i]);
+        myWorld.add_tree(argv[i]);
     }
     
-    lightSource light = lightSource(30.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 1.0f);
+    lightSource light = lightSource(20.0f, 3.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 1.0f, 0.5f, 1.0f);
     
     Shader meuShader("../shaders/myshader.vs", "../shaders/myshader.fs");
     //Shader meuShader("../shaders/light.vs", "../shaders/light.fs");
     
-    myWorld.objs[1]->tree->m->mod->translate(0.0f, 5.0f, 0.0f);
-    myWorld.objs[1]->set_positions();
-    myWorld.objs[1]->isVertStatic = std::vector<bool>(myWorld.objs[1]->position.size(), false); // Initialize all vertices as static
-    myWorld.objs[1]->isVertStatic[0] = true; // Make the first vertex static
-    myWorld.objs[1]->isStatic = false;
-    myWorld.start_world();
+    //myWorld.objs[0]->tree->m->mod->rotate(30.0f, 90.0f, 0.0f);
+    //myWorld.objs[0]->set_positions();
+
+
+    myWorld.trees[1]->obj->m->mod->rotate(45.0f, 0.0f, 0.0f);
+    myWorld.trees[1]->obj->m->mod->translate(0.0f, 5.0f, 2.0f);
+    myWorld.trees[1]->set_positions();
+    myWorld.trees[1]->obj->isVertStatic = std::vector<bool>(myWorld.trees[1]->obj->position.size(), false); // Initialize all vertices as static
+    //myWorld.trees[1]->obj->isVertStatic[0] = true; // Make the first vertex static
+    myWorld.trees[1]->obj->isStatic = false;
     
+    myWorld.trees[3]->obj->m->mod->translate(0.0f, 200.0f, 800.0f);
+    myWorld.trees[3]->set_positions();
+    
+
+    myWorld.trees[4]->obj->m->mod->translate(0.0f, 4.0f, 10.0f);
+    myWorld.trees[4]->set_positions();
+    myWorld.trees[4]->obj->isVertStatic = std::vector<bool>(myWorld.trees[4]->obj->position.size(), false); // Initialize all vertices as static
+    myWorld.trees[4]->obj->isStatic = false;
+    myWorld.trees[4]->obj->isVertStatic[0] = true; // Make the first vertex static
+    myWorld.trees[4]->obj->springRestitution = 1.0f; // Set spring restitution for the object
+
+    myWorld.trees[5]->obj->m->mod->translate(0.0f, 4.0f, -10.0f);
+    myWorld.trees[5]->set_positions();
+    myWorld.trees[5]->obj->isVertStatic = std::vector<bool>(myWorld.trees[5]->obj->position.size(), false); // Initialize all vertices as static
+    myWorld.trees[5]->obj->isStatic = false;
+    
+    myWorld.start_world();
+
+
     // Set up the viewport
     glViewport(0, 0, 800, 600);
     int width, height;
@@ -138,7 +163,7 @@ int main(int argc, char** argv)
 
     /* Loop until the user closes the window */
     long long frameCount = 0;
-    bool saveFrames = true;
+    bool saveFrames = false;
     
     int sceneIndex = 1;
     std::string path = "../scenes/scene" + std::to_string(sceneIndex);
@@ -160,10 +185,10 @@ int main(int argc, char** argv)
             saver.writeOBJ(myWorld);
         }
         frameCount++;
+        
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-
 
         processInput(window);
         glfwGetFramebufferSize(window, &width, &height);
@@ -195,6 +220,11 @@ int main(int argc, char** argv)
         /* Poll for and process events */
         glfwPollEvents();
         
+        if (frameCount == 1000) {
+            myWorld.trees[1]->obj->isVertStatic[0] = false; // Make the first vertex dynamic after 1000 frames
+        }
+
+
     }
 
     glfwTerminate();

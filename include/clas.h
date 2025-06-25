@@ -553,6 +553,7 @@ class mesh{
             for (long long i = 0; i < mod->init_num_faces; i++) {
                 face& f = mod->init_faces[i];
                 if (f.num_vertex < 3) continue; // Skip faces with less than 3 vertices
+                //std::cout << "Calculating normals for face " << i << " with " << f.num_vertex << " vertices." << std::endl;
                 glm::vec3 edge1 = glm::vec3(verts[f.vertices[1] - 1].x - verts[f.vertices[0] - 1].x,
                                                 verts[f.vertices[1] - 1].y - verts[f.vertices[0] - 1].y,
                                                 verts[f.vertices[1] - 1].z - verts[f.vertices[0] - 1].z);
